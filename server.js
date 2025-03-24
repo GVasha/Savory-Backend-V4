@@ -85,19 +85,19 @@ app.get('/', (req, res) => {
       <p>Welcome to the Recipe API. Use the following endpoints to access recipe data:</p>
       
       <div class="endpoint">
-        <h3>Get All Recipes (recipes.json)</h3>
+        <h3> xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxGet All Recipes (recipes.json)</h3>
         <p>URL: <a href="/recipes">/recipes</a></p>
       </div>
       
       <div class="endpoint">
-        <h3>Get Additional Recipes (recipes2.json)</h3>
+        <h3> xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxGet Additional Recipes (recipes2.json)</h3>
         <p>URL: <a href="/recipes2">/recipes2</a></p>
       </div>
       
       <div class="endpoint">
-        <h3>Process YouTube Recipe</h3>
+        <h3> xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxProcess YouTube Recipe</h3>
         <p>URL: POST to /process-youtube</p>
-        <p>Body: { "youtubeLink": "https://www.youtube.com/watch?v=..." }</p>
+        <p>Body:  "youtubeLink": "https://www.youtube.com/watch?v=..." </p>
       </div>
     </body>
     </html>
@@ -112,30 +112,49 @@ const DEEPSEEK_API_URL = 'https://api.deepseek.com/v1';
 const MAX_RETRIES = 5;
 const RETRY_DELAY = 2000; // 2 seconds
 
-// Add retry function
-async function downloadWithRetry(url, options, retries = MAX_RETRIES) {
-  try {
-    return await ytdl(url, options);
-  } catch (error) {
-    if (error.statusCode === 403 && retries > 0) {
-      console.log(`Retry attempt ${MAX_RETRIES - retries + 1} after 403 error...`);
-      await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
-      return downloadWithRetry(url, options, retries - 1);
-    }
-    throw error;
-  }
-}
+// Add this after your other requires
+const cookieJar = { cookies: [] };
 
 // Function to download and extract audio from YouTube video
 async function downloadAndExtractAudio(url) {
   const videoId = ytdl.getVideoID(url);
-  const audioPath = path.join(__dirname, `temp_${videoId}.mp3`);
+  const audioPath = path.join(TEMP_DIR, `temp_${videoId}.mp3`);
 
   return new Promise((resolve, reject) => {
     try {
-      const stream = ytdl(url, {
+      // Use downloadWithRetry with realistic user agent and cookie handling
+      const stream = downloadWithRetry(url, {
         quality: 'highestaudio',
         filter: 'audioonly',
+        requestOptions: {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Referer': 'https://www.youtube.com/',
+            'DNT': '1',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'same-origin',
+            'Sec-Fetch-User': '?1',
+            'Cache-Control': 'max-age=0',
+            'Cookie': cookieJar.cookies.join('; ')
+          }
+        }
+      });
+
+      // Save cookies from response
+      stream.on('response', (response) => {
+        const setCookies = response.headers['set-cookie'];
+        if (setCookies) {
+          cookieJar.cookies = Array.isArray(setCookies) ? 
+            setCookies.map(cookie => cookie.split(';')[0]) : 
+            [setCookies.split(';')[0]];
+          console.log('Cookies saved:', cookieJar.cookies.length);
+        }
       });
 
       stream.on('error', (err) => {
@@ -163,6 +182,20 @@ async function downloadAndExtractAudio(url) {
       reject(error);
     }
   });
+}
+
+// Also update your downloadWithRetry function to pass along the request options
+async function downloadWithRetry(url, options, retries = MAX_RETRIES) {
+  try {
+    return await ytdl(url, options);
+  } catch (error) {
+    if ((error.statusCode === 403 || error.message.includes('sign in')) && retries > 0) {
+      console.log(`Retry attempt ${MAX_RETRIES - retries + 1} after error: ${error.message}`);
+      await new Promise(resolve => setTimeout(resolve, RETRY_DELAY * (MAX_RETRIES - retries + 1))); // Increasing delay
+      return downloadWithRetry(url, options, retries - 1);
+    }
+    throw error;
+  }
 }
 
 // Function to read audio file and convert to base64
