@@ -1,0 +1,24 @@
+{
+  "name": "recipe-backend",
+  "version": "1.0.0",
+  "description": "Recipe API serving JSON data",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@distube/ytdl-core": "^4.16.5",
+    "axios": "^1.8.4",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "fluent-ffmpeg": "^2.1.3"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  }
+}
