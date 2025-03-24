@@ -122,8 +122,8 @@ async function downloadAndExtractAudio(url) {
 
   return new Promise((resolve, reject) => {
     try {
-      // Use downloadWithRetry with realistic user agent and cookie handling
-      const stream = downloadWithRetry(url, {
+      // Create a stream directly with ytdl instead of using downloadWithRetry
+      const stream = ytdl(url, {
         quality: 'highestaudio',
         filter: 'audioonly',
         requestOptions: {
@@ -184,10 +184,12 @@ async function downloadAndExtractAudio(url) {
   });
 }
 
-// Also update your downloadWithRetry function to pass along the request options
+// Modify the downloadWithRetry function to fix the issue
 async function downloadWithRetry(url, options, retries = MAX_RETRIES) {
   try {
-    return await ytdl(url, options);
+    const info = await ytdl.getInfo(url);
+    const formatId = ytdl.chooseFormat(info.formats, options).itag;
+    return ytdl(url, { ...options, quality: formatId });
   } catch (error) {
     if ((error.statusCode === 403 || error.message.includes('sign in')) && retries > 0) {
       console.log(`Retry attempt ${MAX_RETRIES - retries + 1} after error: ${error.message}`);
